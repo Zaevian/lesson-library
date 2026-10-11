@@ -1,0 +1,8 @@
+{
+  "_comment": "Fallback dates for early lessons whose reports and logs carry no date. Estimated by counting back one lesson per day from lesson-006 (2026-09-29). Set estimated:false once confirmed. New lessons should put \"date\" in their report JSON instead.",
+  "spanish-sample-lesson-001": { "date": "2026-09-24", "estimated": true },
+  "spanish-lesson-002": { "date": "2026-09-25", "estimated": true },
+  "spanish-lesson-003": { "date": "2026-09-26", "estimated": true },
+  "spanish-lesson-004": { "date": "2026-09-27", "estimated": true },
+  "spanish-lesson-005": { "date": "2026-09-28", "estimated": true }
+}
