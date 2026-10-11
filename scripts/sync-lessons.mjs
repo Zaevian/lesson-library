@@ -10,12 +10,20 @@
  * Usage:  npm run sync            (from /workspace/lesson-library)
  *         node scripts/sync-lessons.mjs [--dry-run] [--force]
  *
- * Token: BLOB_READ_WRITE_TOKEN from the environment, else from
- *        /home/box/.config/lesson-library.env, else ./.env.local
+ * Storage backend (picked automatically):
+ *   - "blob":   if BLOB_READ_WRITE_TOKEN is set (env, /home/box/.config/lesson-library.env,
+ *               or ./.env.local), videos + manifest go to Vercel Blob.
+ *   - "github": otherwise, videos + manifest go to assets on the GitHub release
+ *               "lessons" of Zaevian/lesson-library, using the box's `gh` login.
+ *               The site streams videos through /video/<language>/<file>.mp4.
+ * Force one with LESSON_BACKEND=blob|github.
  */
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, symlinkSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -26,6 +34,24 @@ const FORCE = args.has("--force");
 
 const TOKEN_FILES = ["/home/box/.config/lesson-library.env", join(REPO, ".env.local")];
 const MANIFEST_PATH = "manifest.json";
+const GH_REPO = process.env.LESSON_GH_REPO || "Zaevian/lesson-library";
+const GH_TAG = process.env.LESSON_GH_TAG || "lessons";
+const GH_DL = `https://github.com/${GH_REPO}/releases/download/${GH_TAG}`;
+
+function gh(args, opts = {}) {
+  return execFileSync("gh", args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], ...opts });
+}
+
+function ghUpload(assetName, sourcePath) {
+  const dir = mkdtempSync(join(tmpdir(), "lesson-sync-"));
+  try {
+    const link = join(dir, assetName);
+    symlinkSync(sourcePath, link);
+    gh(["release", "upload", GH_TAG, link, "--repo", GH_REPO, "--clobber"], { timeout: 300000 });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
 
 const COURSES = [
   {
@@ -133,21 +159,27 @@ function cleanPair(p) {
 
 async function main() {
   const token = loadToken();
-  if (!token && !DRY) {
-    console.error("No BLOB_READ_WRITE_TOKEN found (env, " + TOKEN_FILES.join(", ") + ")");
+  const backend = process.env.LESSON_BACKEND || (token ? "blob" : "github");
+  if (backend === "blob" && !token) {
+    console.error("LESSON_BACKEND=blob but no BLOB_READ_WRITE_TOKEN found (env, " + TOKEN_FILES.join(", ") + ")");
     process.exit(1);
   }
+  console.log(`backend: ${backend}${DRY ? " (dry run)" : ""}`);
   const overrides = readJson(join(__dirname, "lesson-dates.json")) || {};
-  const blob = DRY ? null : await import("@vercel/blob");
+  const blob = backend === "blob" && !DRY ? await import("@vercel/blob") : null;
 
   // Load the current manifest so unchanged videos are not re-uploaded.
   let previous = { lessons: [] };
-  if (!DRY) {
-    try {
-      const meta = await blob.head(MANIFEST_PATH, { token });
-      const res = await fetch(`${meta.url}?t=${Date.now()}`, { cache: "no-store" });
-      if (res.ok) previous = await res.json();
-    } catch { /* first run */ }
+  try {
+    let url = `${GH_DL}/${MANIFEST_PATH}`;
+    if (blob) url = (await blob.head(MANIFEST_PATH, { token })).url;
+    const res = await fetch(`${url}?t=${Date.now()}`, { cache: "no-store", redirect: "follow" });
+    if (res.ok) previous = await res.json();
+  } catch { /* first run */ }
+  let ghAssets = new Map();
+  if (backend === "github" && !DRY) {
+    const info = JSON.parse(gh(["release", "view", GH_TAG, "--repo", GH_REPO, "--json", "assets"]));
+    ghAssets = new Map(info.assets.map((a) => [a.name, a.size]));
   }
   const prevById = new Map((previous.lessons || []).map((l) => [l.id, l]));
 
@@ -183,11 +215,19 @@ async function main() {
 
       const sha1 = sha1File(mp4);
       const pathname = `videos/${course.language}/${slug}.mp4`;
+      const assetName = `${course.language}-${slug}.mp4`;
       const prev = prevById.get(id);
-      let videoUrl = prev && prev.sha1 === sha1 && prev.videoPathname === pathname ? prev.videoUrl : null;
+      let videoUrl = prev && prev.sha1 === sha1 && prev.videoPathname === pathname && prev.backend === backend ? prev.videoUrl : null;
+      if (backend === "github" && videoUrl && ghAssets.get(assetName) !== st.size) videoUrl = null;
       if (!videoUrl || FORCE) {
         if (DRY) {
           videoUrl = `(would upload ${pathname})`;
+        } else if (backend === "github") {
+          process.stdout.write(`upload ${assetName} (${(st.size / 1048576).toFixed(1)} MB) ... `);
+          ghUpload(assetName, mp4);
+          videoUrl = `/video/${course.language}/${slug}.mp4?v=${sha1.slice(0, 10)}`;
+          uploaded++;
+          console.log("ok");
         } else {
           process.stdout.write(`upload ${pathname} (${(st.size / 1048576).toFixed(1)} MB) ... `);
           const res = await blob.put(pathname, readFileSync(mp4), {
@@ -229,6 +269,7 @@ async function main() {
         durationSeconds: report.duration_seconds ?? null,
         sizeBytes: st.size,
         sha1,
+        backend,
         videoPathname: pathname,
         videoUrl,
         pairs: report.pairs.map(cleanPair),
@@ -247,6 +288,7 @@ async function main() {
 
   const manifest = {
     version: 1,
+    backend,
     site: "Opposites Library",
     updatedAt: new Date().toISOString(),
     counts: {
@@ -269,15 +311,23 @@ async function main() {
     console.log(`No changes. ${lessons.length} lessons (es ${manifest.counts.spanish}, ru ${manifest.counts.russian}) already live.`);
     return;
   }
-  const res = await blob.put(MANIFEST_PATH, JSON.stringify(manifest, null, 2), {
-    access: "public",
-    token,
-    contentType: "application/json",
-    addRandomSuffix: false,
-    allowOverwrite: true,
-    cacheControlMaxAge: 60,
-  });
-  console.log(`Uploaded ${uploaded} video(s). Manifest: ${res.url}`);
+  let manifestUrl;
+  if (backend === "github") {
+    const file = join(REPO, ".cache", "manifest.json");
+    gh(["release", "upload", GH_TAG, file, "--repo", GH_REPO, "--clobber"], { timeout: 120000 });
+    manifestUrl = `${GH_DL}/${MANIFEST_PATH}`;
+  } else {
+    const res = await blob.put(MANIFEST_PATH, JSON.stringify(manifest, null, 2), {
+      access: "public",
+      token,
+      contentType: "application/json",
+      addRandomSuffix: false,
+      allowOverwrite: true,
+      cacheControlMaxAge: 60,
+    });
+    manifestUrl = res.url;
+  }
+  console.log(`Uploaded ${uploaded} video(s). Manifest: ${manifestUrl}`);
   console.log(`${lessons.length} lessons (es ${manifest.counts.spanish}, ru ${manifest.counts.russian}). Site updates within ~1-2 minutes.`);
 }
 
