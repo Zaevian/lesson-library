@@ -2,7 +2,7 @@
 
 Zae's Spanish and Russian opposite-pair video lessons in one newest-first feed,
 grouped by date, with All / Spanish / Russian tabs. Next.js 15 on Vercel
-(team `zaevians-projects`, project `lesson-library`).
+(team `zaevians-projects`, project `lesson-library`). Live: https://lesson-library-beta.vercel.app
 
 - Lessons are **not** in git. Videos and `manifest.json` live as assets on the
   GitHub release [`lessons`](https://github.com/Zaevian/lesson-library/releases/tag/lessons)

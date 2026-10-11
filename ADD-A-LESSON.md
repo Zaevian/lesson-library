@@ -1,6 +1,6 @@
 # Add a lesson to the Opposites Library
 
-Live site: https://lesson-library-zaevians-projects.vercel.app
+Live site: https://lesson-library-beta.vercel.app
 No git push and no redeploy are needed. New lessons show up within about 1 to 2 minutes.
 
 ## Daily steps (Spanish 8:00 AM ET, Russian 8:05 AM ET)
@@ -22,7 +22,7 @@ No git push and no redeploy are needed. New lessons show up within about 1 to 2 
 3. Optional check after about 2 minutes:
 
    ```bash
-   curl -s https://lesson-library-zaevians-projects.vercel.app/ | grep -o 'data-lesson-id="[^"]*"' | head -3
+   curl -s https://lesson-library-beta.vercel.app/ | grep -o 'data-lesson-id="[^"]*"' | head -3
    ```
 
    The newest lesson should be listed first.
