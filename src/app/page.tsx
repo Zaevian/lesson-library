@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { LessonFeed } from "@/components/LessonFeed";
 import { getManifest } from "@/lib/manifest";
 
@@ -16,6 +17,7 @@ export default async function Home() {
         <p className="mt-2 max-w-xl text-sm leading-relaxed text-[var(--muted)] sm:text-base">
           Every Spanish and Russian opposite-pair video, newest first. Ten pairs per lesson, one lesson a day per language.
         </p>
+        <Link href="/quiz" className="mt-4 inline-flex items-center gap-2 rounded-xl border border-[var(--es)]/40 bg-[var(--es)]/10 px-4 py-2 text-sm font-semibold text-[var(--es)] hover:bg-[var(--es)]/20">🧠 Daily Spanish Quiz →</Link>
         <div className="mt-4 flex flex-wrap gap-2 text-xs text-[var(--muted)]">
           <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1"><b className="text-white">{counts.total}</b> lessons</span>
           <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1"><b className="text-[var(--es)]">{counts.spanish}</b> Spanish</span>

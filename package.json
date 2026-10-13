@@ -8,8 +8,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "sync": "node scripts/sync-lessons.mjs",
-    "sync:dry": "node scripts/sync-lessons.mjs --dry-run"
+    "sync": "node scripts/sync-lessons.mjs && node scripts/sync-quiz.mjs",
+    "sync:dry": "node scripts/sync-lessons.mjs --dry-run",
+    "sync-quiz": "node scripts/sync-quiz.mjs",
+    "sync-quiz:dry": "node scripts/sync-quiz.mjs --dry-run"
   },
   "dependencies": {
     "@vercel/blob": "^2.0.0",

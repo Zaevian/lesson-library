@@ -1,0 +1,41 @@
+{
+  "date": "YYYY-MM-DD",
+  "title": "Short list of today's traps",
+  "level": "B1–B2",
+  "questions": [
+    {
+      "id": "q1",
+      "type": "mc",
+      "trap": "por / para",
+      "words": ["por", "para"],
+      "prompt": "Pick the right word: \"Estudio ___ aprobar el examen.\"",
+      "options": [
+        { "text": "para" },
+        { "text": "por", "why": "Why this wrong option is wrong (optional)." }
+      ],
+      "answer": 0,
+      "explanation": "Why the right answer is right.",
+      "variants": [
+        {
+          "id": "q1v1",
+          "type": "fill",
+          "prompt": "Fill in the blank: \"Salgo ___ Madrid mañana.\" (destination)",
+          "answers": ["para"],
+          "wrong": { "por": "Optional: explanation shown when this exact wrong answer is typed." },
+          "explanation": "Para + place = destination."
+        }
+      ]
+    },
+    {
+      "id": "q2",
+      "type": "translate",
+      "trap": "se lo",
+      "prompt": "Translate to Spanish: \"I gave it to her.\"",
+      "answers": ["se lo di", "yo se lo di", "se lo di a ella"],
+      "explanation": "le + lo → se lo.",
+      "variants": [
+        { "id": "q2v1", "type": "fill", "prompt": "\"¿Le diste la carta?\" — \"Sí, se ___ di.\"", "answers": ["la"], "explanation": "la = la carta." }
+      ]
+    }
+  ]
+}
